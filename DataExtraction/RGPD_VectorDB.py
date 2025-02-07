@@ -12,8 +12,6 @@ import os
 import shutil
 from dotenv import load_dotenv
 
-# --- Configuration ---
-# Charger les variables d'environnement
 load_dotenv()
 openai_api_key = os.getenv('OPENAI_API_KEY')
 client = AsyncOpenAI(api_key=openai_api_key)
@@ -23,7 +21,6 @@ SANCTIONS_FILE = "./Extractions/ALL_SANCTIONS_CNIL.csv"
 
 VECTOR_DB_PATH = "../rgpd_embeddings_db"
 
-# Définir le template de prompt
 prompt_template = PromptTemplate(
     template="""En utilisant le contexte suivant, réponds à la question.
     
@@ -35,7 +32,6 @@ prompt_template = PromptTemplate(
     input_variables=["context", "query"]
 )
 
-# Initialiser le modèle et la chaîne
 llm = ChatOpenAI(model="gpt-4o-mini", openai_api_key=openai_api_key)
 chain = prompt_template | llm | RunnablePassthrough()
 
@@ -58,7 +54,7 @@ def create_vector_database():
         shutil.rmtree(VECTOR_DB_PATH) 
 
     print("📥 Chargement des fichiers...")
-    df_rgpd = load_and_process_csv(RGPD_FILE, ['Numero alinea', 'Texte'], ['Numero alinea'], "RGPD")
+    df_rgpd = load_and_process_csv(RGPD_FILE, ['Numero alinea', 'Texte'], ['Numero alinea', 'Texte'], "RGPD")
     df_articles = load_and_process_csv(ARTICLES_FILE, ['Chapitre', 'Article', 'Alinea', 'Sous-Alinea'], ['Chapitre', 'Article'], "Articles RGPD")
     df_sanctions = load_and_process_csv(SANCTIONS_FILE, ['Date', 'Type_Organisme', 'Manquement', 'Sanction'], ['Date', 'Type_Organisme', 'Manquement', 'Sanction'], "Sanctions CNIL")
 
@@ -82,7 +78,7 @@ def create_vector_database():
 async def query_vector_database_stream(query: str) -> AsyncIterable[str]:
     print("Démarrage de la requête...")
     embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
-    vectorstore = Chroma(persist_directory="./rgpd_embeddings_db", embedding_function=embeddings)
+    vectorstore = Chroma(persist_directory=VECTOR_DB_PATH, embedding_function=embeddings)
     
     print("Recherche dans la base vectorielle...")
     relevant_documents = vectorstore.similarity_search(query, k=5)
@@ -92,11 +88,8 @@ async def query_vector_database_stream(query: str) -> AsyncIterable[str]:
     message_id = f"msg-{uuid.uuid4().hex}"
     print(f"ID du message généré: {message_id}")
     
-    # Envoyer l'identifiant du message
-    # yield json.dumps({"messageId": message_id}) + "\n"
-
     messages = [
-        {"role": "system", "content": "Tu es un expert du RGPD qui répond de manière précise et concise."},
+        {"role": "system", "content": "Tu es un expert du RGPD qui répond de manière précise et concise. Tu as accès à une base de données de documents juridiques. Tu dois répondre à la question en ajoutant les articles cités ainsi que leur numéro quand cela est possible."},
         {"role": "user", "content": f"En utilisant le contexte suivant, réponds à la question.\n\nContexte: {context}\n\nQuestion: {query}\n\nRéponse:"}
     ]
 
@@ -108,11 +101,8 @@ async def query_vector_database_stream(query: str) -> AsyncIterable[str]:
             messages=messages,
             stream=True
         )
-        # print(stream.choices[0].message.content)
 
         async for chunk in stream:
-            # print("Chunk brut:", chunk)
-            # Vérifie la présence de contenu textuel
             if chunk.choices and chunk.choices[0].delta.content:
                 token = chunk.choices[0].delta.content
                 print("Token reçu :", token)
