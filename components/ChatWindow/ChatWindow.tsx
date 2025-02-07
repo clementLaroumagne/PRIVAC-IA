@@ -123,6 +123,12 @@ export default function ChatInterface() {
     try {
       setIsLoading(true);
       
+      // Ajouter le message de l'utilisateur
+      const userMessage = { role: 'user', content: input };
+      const assistantMessage = { role: 'assistant', content: '' };
+      setMessages(prev => [...prev, userMessage, assistantMessage]);
+      setInput('');
+
       const response = await fetch(`http://${window.location.hostname}:8000/query`, {
         method: 'POST',
         headers: {
@@ -138,7 +144,6 @@ export default function ChatInterface() {
       const reader = response.body?.getReader();
       if (!reader) throw new Error('Impossible de lire la réponse');
 
-      setInput('');
       let accumulatedContent = '';
 
       while (true) {
@@ -160,11 +165,11 @@ export default function ChatInterface() {
           return newMessages;
         });
       }
+
     } catch (error) {
       console.error("Erreur:", error);
       setCurrentAnimation('CharacterArmature|Death');
       
-      // Message d'erreur plus détaillé
       toast({
         title: "Erreur",
         description: error instanceof Error 
@@ -174,7 +179,7 @@ export default function ChatInterface() {
         duration: 5000,
       });
       
-      // Supprimer le message assistant vide
+      // Supprimer le message assistant vide en cas d'erreur
       setMessages(prev => prev.slice(0, -1));
       
       setTimeout(() => {
