@@ -1,0 +1,33 @@
+.loadingBar {
+    width: 100%;
+    height: 2px;
+    background-color: #f0f0f0;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .loadingBar::after {
+    content: '';
+    position: absolute;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(to right, 
+      #0055A4 33.33%, /* Bleu */
+      #FFFFFF 33.33%, #FFFFFF 66.66%, /* Blanc */
+      #EF4135 66.66% /* Rouge */
+    );
+    animation: loading 1s infinite ease-in-out;
+  }
+
+  .custom-bg-bleu-france {
+    background-color: #002654;
+  }
+  
+  @keyframes loading {
+    0% {
+      left: -40%;
+    }
+    100% {
+      left: 100%;
+    }
+  }
