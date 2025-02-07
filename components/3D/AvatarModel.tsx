@@ -16,6 +16,37 @@ function Character({ modelPath, animationName = 'idle', isLookingDown = false }:
   const { scene, animations } = useGLTF(modelPath, true);
   const { actions } = useAnimations(animations, group);
 
+  // Ajout du suivi de la souris
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (group.current) {
+        // Calculer la position relative de la souris par rapport au centre de l'écran
+        const mouseX = (event.clientX - window.innerWidth / 2) / window.innerWidth;
+        const mouseY = (event.clientY - window.innerHeight / 2) / window.innerHeight;
+
+        // Limiter la rotation
+        const maxRotation = 1;
+        gsap.to(group.current.rotation, {
+          y: mouseX * maxRotation,
+          x: mouseY * maxRotation + 0.5,
+          duration: 0.5,
+          ease: 'power2.out',
+          overwrite: true
+
+        });
+      }
+    };
+
+    // N'ajouter l'écouteur que sur les appareils de bureau
+    if (window.matchMedia('(pointer: fine)').matches) {
+      window.addEventListener('mousemove', handleMouseMove);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
   // Animation de rotation
   useEffect(() => {
     if (group.current) {
@@ -32,7 +63,6 @@ function Character({ modelPath, animationName = 'idle', isLookingDown = false }:
   useEffect(() => {
     console.log('Animations disponibles:', Object.keys(actions));
 
-    // Transition en douceur entre les animations
     Object.values(actions).forEach(action => {
       if (action) {
         action.fadeOut(0.5);
@@ -41,11 +71,25 @@ function Character({ modelPath, animationName = 'idle', isLookingDown = false }:
 
     const targetAction = actions[animationName];
     if (targetAction) {
-      targetAction.reset().fadeIn(0.5).play();
+      if (animationName === 'CharacterArmature|Death') {
+        targetAction.reset()
+          .fadeIn(0.5)
+          .play()
+          .setLoop(THREE.LoopOnce, 1);
+        targetAction.clampWhenFinished = true;
+      } else if (animationName === 'CharacterArmature|Idle') {
+        targetAction.reset()
+          .fadeIn(0.5)
+          .play();
+        targetAction.timeScale = 0.5;
+      } else {
+        targetAction.reset()
+          .fadeIn(0.5)
+          .play();
+      }
     }
 
     return () => {
-      // Ne pas nettoyer le groupe lors des changements d'animation
       Object.values(actions).forEach(action => {
         if (action) {
           action.fadeOut(0.5);

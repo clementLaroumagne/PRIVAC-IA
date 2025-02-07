@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Send, Copy, Menu } from "lucide-react";
+import { Plus, Send, Copy, Menu, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   HoverCard,
@@ -14,7 +14,16 @@ import styles from "./ChatWindow.module.css";
 import { useToast } from "@/hooks/use-toast";
 import AvatarModel from "../3D/AvatarModel";
 
+interface Conversation {
+  id: string;
+  name: string;
+  messages: Array<{role: string, content: string}>;
+  timestamp: number;
+}
+
 export default function ChatInterface() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string>('');
   const [messages, setMessages] = useState<Array<{role: string, content: string}>>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -30,11 +39,82 @@ export default function ChatInterface() {
     setCurrentAnimation(isLoading ? 'CharacterArmature|Jump' : 'CharacterArmature|Idle');
   }, [isLoading]);
 
+  // Charger les conversations au démarrage
+  useEffect(() => {
+    const savedConversations = localStorage.getItem('conversations');
+    if (savedConversations) {
+      const parsed = JSON.parse(savedConversations);
+      setConversations(parsed);
+      
+      // Charger la dernière conversation si aucune n'est sélectionnée
+      if (!currentConversationId && parsed.length > 0) {
+        setCurrentConversationId(parsed[0].id);
+        setMessages(parsed[0].messages);
+      }
+    } else {
+      // Créer une première conversation si aucune n'existe
+      const initialConversation: Conversation = {
+        id: Date.now().toString(),
+        name: `Conversation du ${new Date().toLocaleDateString()}`,
+        messages: [],
+        timestamp: Date.now()
+      };
+      
+      setConversations([initialConversation]);
+      setCurrentConversationId(initialConversation.id);
+      setMessages([]);
+      localStorage.setItem('conversations', JSON.stringify([initialConversation]));
+    }
+  }, []);
+
+  // Créer une nouvelle conversation
+  const createNewConversation = () => {
+    const newConversation: Conversation = {
+      id: Date.now().toString(),
+      name: `Conversation du ${new Date().toLocaleDateString()}`,
+      messages: [],
+      timestamp: Date.now()
+    };
+    
+    setConversations(prev => {
+      const updated = [newConversation, ...prev];
+      localStorage.setItem('conversations', JSON.stringify(updated));
+      return updated;
+    });
+    
+    setCurrentConversationId(newConversation.id);
+    setMessages([]);
+    setIsMenuOpen(false);
+  };
+
+  // Sauvegarder les messages de la conversation courante
+  useEffect(() => {
+    if (currentConversationId && messages.length > 0) {
+      setConversations(prev => {
+        const updated = prev.map(conv => 
+          conv.id === currentConversationId 
+            ? { ...conv, messages: messages }
+            : conv
+        );
+        localStorage.setItem('conversations', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  }, [messages, currentConversationId]);
+
+  // Changer de conversation
+  const switchConversation = (conversationId: string) => {
+    const conversation = conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      setCurrentConversationId(conversationId);
+      setMessages(conversation.messages);
+      setIsMenuOpen(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
   };
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,14 +122,6 @@ export default function ChatInterface() {
 
     try {
       setIsLoading(true);
-      console.log("isLoading", isLoading);
-      
-      // Créer un message assistant vide et ajouter le message utilisateur en une seule mise à jour
-      setMessages(prev => [
-        ...prev, 
-        { role: 'user', content: input },
-        { role: 'assistant', content: '' }
-      ]);
       
       const response = await fetch(`http://${window.location.hostname}:8000/query`, {
         method: 'POST',
@@ -59,7 +131,9 @@ export default function ChatInterface() {
         body: JSON.stringify({ question: input }),
       });
 
-      if (!response.ok) throw new Error('Erreur réseau');
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error('Impossible de lire la réponse');
@@ -88,12 +162,25 @@ export default function ChatInterface() {
       }
     } catch (error) {
       console.error("Erreur:", error);
+      setCurrentAnimation('CharacterArmature|Death');
+      
+      // Message d'erreur plus détaillé
       toast({
-        description: "Erreur lors de l'envoi du message",
+        title: "Erreur",
+        description: error instanceof Error 
+          ? error.message 
+          : "Une erreur est survenue lors de l'envoi du message",
         variant: "destructive",
-        duration: 3000,
+        duration: 5000,
       });
-      setIsLoading(false);
+      
+      // Supprimer le message assistant vide
+      setMessages(prev => prev.slice(0, -1));
+      
+      setTimeout(() => {
+        setCurrentAnimation('CharacterArmature|Idle');
+        setIsLoading(false);
+      }, 5000);
     }
   };
 
@@ -130,27 +217,77 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
+  // Ajouter la fonction de suppression
+  const deleteConversation = (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    setConversations(prev => {
+      const updated = prev.filter(conv => conv.id !== conversationId);
+      localStorage.setItem('conversations', JSON.stringify(updated));
+      
+      // Si on supprime la conversation courante
+      if (conversationId === currentConversationId) {
+        if (updated.length > 0) {
+          // On met à jour immédiatement les états
+          const nextConversation = updated[0];
+          setTimeout(() => {
+            setCurrentConversationId(nextConversation.id);
+            setMessages(nextConversation.messages);
+          }, 0);
+        } else {
+          // Si plus aucune conversation
+          setTimeout(() => {
+            setCurrentConversationId('');
+            setMessages([]);
+          }, 0);
+        }
+      }
+      
+      return updated;
+    });
+  };
+
   return (
     <div className="flex w-full h-full items-center">
-      {/* Menu latéral */}
-      <div
-        className={`fixed top-0 left-0 h-[98dvh] md:h-[95dvh] mt-[1dvh] md:mt-[2.5dvh] bg-white shadow-sm border transition-transform duration-300 w-[300px] rounded-3xl ${
-          isMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-
-        <div className="p-4">
-          <ul>
-            <li className="py-4 px-6 my-2 hover:bg-gray-100 cursor-pointer border-bleu-france border-2 rounded-2xl">
-              Conversation 1
-            </li>
-            <li className="py-4 px-6 my-2 hover:bg-gray-100 cursor-pointer border-2 rounded-2xl">
-              Conversation 2
-            </li>
-            <li className="py-4 px-6 my-2 hover:bg-gray-100 cursor-pointer border-2 rounded-2xl">
-              Conversation 3
-            </li>
-          </ul>
+      {/* Menu latéral modifié */}
+      <div className={`fixed top-0 left-0 h-[98dvh] md:h-[95dvh] mt-[1dvh] md:mt-[2.5dvh] bg-white shadow-sm border transition-transform duration-300 w-[300px] rounded-3xl flex flex-col ${
+        isMenuOpen ? "translate-x-0" : "-translate-x-full"
+      }`}>
+        <div className="p-4 flex flex-col h-full">
+          <Button 
+            onClick={createNewConversation}
+            className="w-full mb-4 bg-bleu-france hover:bg-blue-900 flex-shrink-0 rounded-xl"
+          >
+            Nouvelle conversation
+            <Plus className="h-5 w-5" />
+          </Button>
+          
+          <div className="overflow-y-auto flex-grow [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
+            <ul className="space-y-2">
+              {conversations.map((conv) => (
+                <li 
+                  key={conv.id}
+                  className={`py-4 px-6 hover:bg-gray-100 cursor-pointer border-2 rounded-2xl ${
+                    currentConversationId === conv.id ? 'border-bleu-france' : ''
+                  } flex justify-between items-center`}
+                >
+                  <span onClick={() => switchConversation(conv.id)}>
+                    {conv.name}
+                  </span>
+                  {currentConversationId !== conv.id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full h-8 w-8 hover:bg-red-100"
+                      onClick={(e) => deleteConversation(conv.id, e)}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -176,10 +313,6 @@ export default function ChatInterface() {
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-3">
-              {/* <Avatar className="h-10 w-10">
-                <AvatarImage src="bot.png" alt="" />
-                <AvatarFallback>RGPD</AvatarFallback>
-              </Avatar> */}
               <Suspense fallback={<div>Chargement...</div>}>
                 <AvatarModel 
                   className="h-20 w-20" 
@@ -196,7 +329,12 @@ export default function ChatInterface() {
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-full"
+              onClick={createNewConversation}
+            >
               <Plus className="h-5 w-5" />
             </Button>
           </div>
