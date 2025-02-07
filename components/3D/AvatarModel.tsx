@@ -107,4 +107,4 @@ export default function AvatarModel({
   );
 }
 
-useGLTF.preload('/robot.glb');
+useGLTF.preload(process.env.PUBLIC_URL + '/robot.glb');
