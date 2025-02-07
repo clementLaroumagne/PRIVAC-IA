@@ -1,7 +1,12 @@
-import type { NextConfig } from "next";
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  webpack: (config:any) => {
+    config.externals.push({
+      'three/examples/jsm/controls/DeviceOrientationControls': 'null',
+      'three/examples/js/libs/stats.min': 'null',
+    });
+    return config;
+  },
+}
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
-
-export default nextConfig;
+module.exports = nextConfig;

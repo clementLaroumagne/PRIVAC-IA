@@ -25,8 +25,9 @@ export default function ChatInterface() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [currentAnimation, setCurrentAnimation] = useState('CharacterArmature|Idle');
   const [isLookingDown, setIsLookingDown] = useState(false);
+  
   useEffect(() => {
-    isLoading ? setCurrentAnimation('CharacterArmature|Jump') : setCurrentAnimation('CharacterArmature|Idle');
+    setCurrentAnimation(isLoading ? 'CharacterArmature|Jump' : 'CharacterArmature|Idle');
   }, [isLoading]);
 
 
