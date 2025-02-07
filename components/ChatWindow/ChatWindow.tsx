@@ -50,7 +50,7 @@ export default function ChatInterface() {
         { role: 'assistant', content: '' }
       ]);
       
-      const response = await fetch('http://localhost:8000/query', {
+      const response = await fetch(`http://${window.location.hostname}:8000/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
