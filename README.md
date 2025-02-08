@@ -20,3 +20,7 @@ cd DataExtractions/
 ```bash
 python executor_api.py
 ```
+
+Le projet ouvre le port :3000 pour le front et que le port :8000 pour le chatbot sur votre réseau local.
+
+--> http://localhost:3000
