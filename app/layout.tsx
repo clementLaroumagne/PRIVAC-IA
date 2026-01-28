@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RGPDBot",
+  title: "PRIVAC-IA",
   description: "Votre assistant RGPD",
+  icons: {
+    icon: "/bot.png",
+  },
   viewport: {
     width: "device-width",
     initialScale: 1,
